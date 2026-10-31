@@ -1,7 +1,7 @@
 {
   "name": "usage-bar",
-  "version": "0.1.0",
-  "description": "Plan usage (5-hour and weekly limits) beside the mic: click for reset times, warns once at 80%, and gives Claude a check_usage tool.",
+  "version": "0.2.0",
+  "description": "Plan usage (5-hour and weekly limits) in the footer: click for reset times, warns once at 80%, and gives Claude a check_usage tool.",
   "author": {
     "name": "spacemanusd"
   },
@@ -10,8 +10,8 @@
     "placement": {
       "type": "string",
       "title": "Where the usage readout sits",
-      "description": "band = the row with the mic and model badge; footer = the bottom row, next to the jobs bar",
-      "default": "band",
+      "description": "footer = the bottom row, next to the jobs bar; band = the row with the mic and model badge",
+      "default": "footer",
       "options": [
         "band",
         "footer"

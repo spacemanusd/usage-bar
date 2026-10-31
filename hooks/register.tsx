@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderElement, ResolveInput, SessionRateLimit } from 'claude-code'
+import type { EngineInterface, Register, ResolveInput, SessionRateLimit } from 'claude-code'
 
 import type { Limit } from '../types'
 
@@ -84,17 +84,13 @@ async function store($: EngineInterface, raw: readonly SessionRateLimit[], warnA
   }
 }
 
-// The chip "5h ▰▰▰▱▱ 58% · 7d 31%" after what's beneath, and the panel under it while open.
-async function chipAndPanel($: EngineInterface, e: ResolveInput, inner: RenderElement, columns: number) {
-  const ls = await read($, limits)
-  const open = await read($, isOpen)
-  const at = (await read($, now)) || (await $.clock.now())
+// The chip: "5h ▰▰▰▱▱ 58% · 7d 31% ▾"; clicking it opens the panel.
+function chip($: EngineInterface, e: ResolveInput, ls: Limit[], open: boolean) {
+  const { Button, Text } = $.ui.resolve(e)
   const [first, ...rest] = ls
-  if (!first) return inner
-
-  const { Box, Button, Text } = $.ui.resolve(e)
+  if (!first) return null
   const [f, m] = meter(first.pct, 5)
-  const chip = (
+  return (
     <Button plain key="usage" label="Usage" onPress={() => update($, isOpen, v => !v)}>
       <Text dimColor>{label(first.kind).short} </Text>
       <Text color={levelColor(first.pct)}>{f}</Text>
@@ -109,41 +105,33 @@ async function chipAndPanel($: EngineInterface, e: ResolveInput, inner: RenderEl
       <Text dimColor> {open ? '▴' : '▾'}  </Text>
     </Button>
   )
-  const row = (
-    <Box flexDirection="row" alignItems="flex-start">
-      {inner}
-      <Box marginLeft={2}>{chip}</Box>
-    </Box>
-  )
-  if (!open) return row
+}
 
-  // Boxed like Sam's tools and the jobs panel
-  const width = Math.min(64, columns)
+// The panel, boxed like Sam's tools and the jobs panel.
+function panel($: EngineInterface, e: ResolveInput, ls: Limit[], at: number, columns: number) {
+  const { Box, Text } = $.ui.resolve(e)
   return (
-    <Box flexDirection="column">
-      {row}
-      <Box flexDirection="column" borderStyle="round" borderColor={MINT} paddingX={1} width={width}>
-        <Text color={GLOW} bold>◆ USAGE</Text>
-        {ls.map(l => {
-          const [lf, lm] = meter(l.pct, 12)
-          return (
-            <Text key={`row-${l.kind}`}>
-              <Text color={GLOW}>{label(l.kind).long.padEnd(7)} </Text>
-              <Text color={levelColor(l.pct)}>{lf}</Text>
-              <Text color={TEAL}>{lm}</Text>
-              <Text color={levelColor(l.pct)}> {String(Math.round(l.pct)).padStart(3)}%</Text>
-              <Text dimColor>  resets {until(l.resetsAt, at)}{l.resetsAt ? ` · ${clockTime(l.resetsAt, at)}` : ''}</Text>
-            </Text>
-          )
-        })}
-        <Text dimColor>Click the chip or type /usage-bar to close</Text>
-      </Box>
+    <Box flexDirection="column" borderStyle="round" borderColor={MINT} paddingX={1} width={Math.min(64, columns)}>
+      <Text color={GLOW} bold>◆ USAGE</Text>
+      {ls.map(l => {
+        const [lf, lm] = meter(l.pct, 12)
+        return (
+          <Text key={`row-${l.kind}`}>
+            <Text color={GLOW}>{label(l.kind).long.padEnd(7)} </Text>
+            <Text color={levelColor(l.pct)}>{lf}</Text>
+            <Text color={TEAL}>{lm}</Text>
+            <Text color={levelColor(l.pct)}> {String(Math.round(l.pct)).padStart(3)}%</Text>
+            <Text dimColor>  resets {until(l.resetsAt, at)}{l.resetsAt ? ` · ${clockTime(l.resetsAt, at)}` : ''}</Text>
+          </Text>
+        )
+      })}
+      <Text dimColor>Click the chip or type /usage-bar to close</Text>
     </Box>
   )
 }
 
 export const register: Register = (on, options) => {
-  const placement = options.placement === 'footer' ? 'footer' : 'band'
+  const placement = options.placement === 'band' ? 'band' : 'footer'
   const warnAt = Number(options.warnAt ?? 80) || 80
 
   on('session.start', async ($, e, next) => {
@@ -193,16 +181,44 @@ export const register: Register = (on, options) => {
     return { result: describe(ls, await $.clock.now()) }
   })
 
-  // Band (default): beside the mic and model badge. Footer: next to the jobs bar.
-  // Both wrap the drawing beneath, so the other mods' pieces still show.
+  // Footer (default): the chip next to the jobs bar. Band: the chip beside the mic and model badge.
+  // The panel always opens above the prompt, like the jobs panel.
+  // Every hook wraps the drawing beneath, so the other mods' pieces still show.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const inner = await next(e)
-    if (placement !== 'band' || e.props.hasSurvey) return inner
-    return chipAndPanel($, e, inner, e.props.bodyColumns)
+    const ls = await read($, limits)
+    if (e.props.hasSurvey || !ls.length) return inner
+    const open = await read($, isOpen)
+    const { Box } = $.ui.resolve(e)
+    const top =
+      placement === 'band' ? (
+        <Box flexDirection="row" alignItems="flex-start">
+          {inner}
+          <Box marginLeft={2}>{chip($, e, ls, open)}</Box>
+        </Box>
+      ) : (
+        inner
+      )
+    if (!open) return top
+    const at = (await read($, now)) || (await $.clock.now())
+    return (
+      <Box flexDirection="column">
+        {top}
+        {panel($, e, ls, at, e.props.bodyColumns ?? 64)}
+      </Box>
+    )
   })
   on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
     const inner = await next(e)
     if (placement !== 'footer') return inner
-    return chipAndPanel($, e, inner, 64)
+    const ls = await read($, limits)
+    if (!ls.length) return inner
+    const { Box } = $.ui.resolve(e)
+    return (
+      <Box>
+        {inner}
+        {chip($, e, ls, await read($, isOpen))}
+      </Box>
+    )
   })
 }
