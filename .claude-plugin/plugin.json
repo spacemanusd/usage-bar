@@ -1,0 +1,27 @@
+{
+  "name": "usage-bar",
+  "version": "0.1.0",
+  "description": "Plan usage (5-hour and weekly limits) beside the mic: click for reset times, warns once at 80%, and gives Claude a check_usage tool.",
+  "author": {
+    "name": "spacemanusd"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "placement": {
+      "type": "string",
+      "title": "Where the usage readout sits",
+      "description": "band = the row with the mic and model badge; footer = the bottom row, next to the jobs bar",
+      "default": "band",
+      "options": [
+        "band",
+        "footer"
+      ]
+    },
+    "warnAt": {
+      "type": "number",
+      "title": "Warn at percent",
+      "description": "Show one pop-up per window when its usage crosses this percent",
+      "default": 80
+    }
+  }
+}
