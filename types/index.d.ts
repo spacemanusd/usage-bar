@@ -8,6 +8,10 @@ declare module 'claude-code' {
       limits: Limit[]
       isOpen: boolean
       now: number
+      // Flips every 1.2s while Claude is out, for the Odysseus chip's soft green pulse
+      pulse: boolean
+      // The last message failed on the usage limit (the last reading can still say 98%)
+      limited: boolean
     }
   }
 }

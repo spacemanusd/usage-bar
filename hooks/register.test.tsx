@@ -108,3 +108,47 @@ test('placement: band puts the chip beside the mic instead', { options: { placem
   expect(await band.find({ type: 'Text', text: /USAGE/ })).toBeDefined()
   await band.unmount()
 })
+
+test('Claude out: a green Odysseus chip appears in the footer and opens Odysseus only when clicked', async ($, on) => {
+  const out = [{ ...READING[1]!, percentUsed: 100 }, READING[0]!]
+  setup(on, () => out)
+  const opened: string[][] = []
+  on('process.run', (_, e) => {
+    opened.push([...e.argv])
+    return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+
+  const footer = await $.ui.mount({ ...FOOTER, surface: 'terminal' })
+  expect(await footer.find({ type: 'Text', text: /Odysseus/ })).toBeDefined()
+  expect(opened).toEqual([]) // nothing opens by itself
+  await footer.press({ key: 'odysseus' })
+  expect(opened).toEqual([['cmd', '/c', 'start', '', 'http://localhost:7000']])
+  await footer.unmount()
+})
+
+test('not out: no Odysseus chip', async ($, on) => {
+  setup(on, () => READING)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  const footer = await $.ui.mount({ ...FOOTER, surface: 'terminal' })
+  expect(await footer.find({ type: 'Text', text: /58%/ })).toBeDefined()
+  expect(await footer.find({ type: 'Text', text: /Odysseus/ })).toBeUndefined()
+  await footer.unmount()
+})
+
+test('a message that fails on the usage limit shows the chip even if the last reading said 97%; a good reply clears it', async ($, on) => {
+  setup(on, () => [{ ...READING[1]!, percentUsed: 97 }, READING[0]!])
+  on('turn.complete', (_, e) => ({ text: '', answer: '' }) as never)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.session.measure({ context: {} as never, rateLimits: [{ ...READING[1]!, percentUsed: 97 }, READING[0]!], changed: ['rateLimits'] })
+
+  await $.turn.complete({ turnId: 't1', reason: 'error', answer: 'Claude usage limit reached. Your limit will reset at 3pm.', durationMs: 1, isAborted: false } as never)
+  const footer = await $.ui.mount({ ...FOOTER, surface: 'terminal' })
+  expect(await footer.find({ type: 'Text', text: /Odysseus/ })).toBeDefined()
+  await footer.unmount()
+
+  await $.turn.complete({ turnId: 't2', reason: 'answer', answer: 'done', durationMs: 1, isAborted: false } as never)
+  const after = await $.ui.mount({ ...FOOTER, surface: 'terminal' })
+  expect(await after.find({ type: 'Text', text: /Odysseus/ })).toBeUndefined()
+  await after.unmount()
+})

@@ -6,6 +6,15 @@ import type { Limit } from '../types'
 const limits = atom({ plugin: 'usage-bar', key: 'limits' } as const, [] as Limit[])
 const isOpen = atom({ plugin: 'usage-bar', key: 'isOpen' } as const, false)
 const now = atom({ plugin: 'usage-bar', key: 'now' } as const, 0)
+const pulse = atom({ plugin: 'usage-bar', key: 'pulse' } as const, false)
+const limited = atom({ plugin: 'usage-bar', key: 'limited' } as const, false)
+export const LIMIT_ERROR = /usage limit|rate[ _-]?limit|limit reached|out of (usage|credits)/i
+
+// When a window is used up, a soft "matrix green" Odysseus chip appears; clicking it opens Odysseus.
+// It never opens anything by itself.
+export const isOut = (ls: Limit[]) => ls.some(l => (l.kind === 'five_hour' || l.kind === 'seven_day') && l.pct >= 99.5)
+const MATRIX_FG = ['#3DDC84', '#7CFFA3'] as const
+const MATRIX_BG = ['#0B1F12', '#103A1E'] as const
 
 // Tractor Beam palette (same as job-bar)
 const MINT = '#81B5A5'
@@ -130,9 +139,22 @@ function panel($: EngineInterface, e: ResolveInput, ls: Limit[], at: number, col
   )
 }
 
+function odysseusChip($: EngineInterface, e: ResolveInput, phase: number, url: string) {
+  const { Button, Text } = $.ui.resolve(e)
+  return (
+    <Button plain key="odysseus" label="Odysseus" onPress={() => void $.process.run(['cmd', '/c', 'start', '', url]).catch(() => $.ui.toast(`Couldn't open ${url}`))}>
+      <Text backgroundColor={MATRIX_BG[phase]} color={MATRIX_FG[phase]} bold>
+        {' ◆ Odysseus › '}
+      </Text>
+      <Text> </Text>
+    </Button>
+  )
+}
+
 export const register: Register = (on, options) => {
   const placement = options.placement === 'band' ? 'band' : 'footer'
   const warnAt = Number(options.warnAt ?? 80) || 80
+  const odysseusUrl = String(options.odysseusUrl ?? 'http://localhost:7000') || 'http://localhost:7000'
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
@@ -148,6 +170,11 @@ export const register: Register = (on, options) => {
       // no reading yet: the first measure after a reply fills it
     }
     // Keeps "resets in ..." fresh while the panel is open; idle otherwise.
+    $.clock.every(1200, () => {
+      void (async () => {
+        if (isOut(await read($, limits)) || (await read($, limited))) await update($, pulse, v => !v)
+      })()
+    })
     $.clock.every(MIN, () => {
       void (async () => {
         if (await read($, isOpen)) {
@@ -163,6 +190,15 @@ export const register: Register = (on, options) => {
   on('session.measure', async ($, e, next) => {
     const r = await next(e)
     if (e.changed.includes('rateLimits')) await store($, e.rateLimits, warnAt)
+    return r
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    const r = await next(e)
+    if (!e.agentId) {
+      const failedOnLimit = e.reason === 'error' && LIMIT_ERROR.test(String(e.answer ?? ''))
+      if (failedOnLimit !== (await read($, limited))) await update($, limited, () => failedOnLimit)
+    }
     return r
   })
 
@@ -195,6 +231,7 @@ export const register: Register = (on, options) => {
         <Box flexDirection="row" alignItems="flex-start">
           {inner}
           <Box marginLeft={2}>{chip($, e, ls, open)}</Box>
+          {isOut(ls) || (await read($, limited)) ? odysseusChip($, e, (await read($, pulse)) ? 1 : 0, odysseusUrl) : null}
         </Box>
       ) : (
         inner
@@ -212,12 +249,14 @@ export const register: Register = (on, options) => {
     const inner = await next(e)
     if (placement !== 'footer') return inner
     const ls = await read($, limits)
-    if (!ls.length) return inner
+    const out = isOut(ls) || (await read($, limited))
+    if (!ls.length && !out) return inner
     const { Box } = $.ui.resolve(e)
     return (
       <Box>
         {inner}
         {chip($, e, ls, await read($, isOpen))}
+        {out ? odysseusChip($, e, (await read($, pulse)) ? 1 : 0, odysseusUrl) : null}
       </Box>
     )
   })
