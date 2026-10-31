@@ -1,6 +1,6 @@
 {
   "name": "usage-bar",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Plan usage (5-hour and weekly limits) in the footer: click for reset times, warns once at 80%, a green Odysseus shortcut when Claude runs out, and a check_usage tool for Claude.",
   "author": {
     "name": "spacemanusd"

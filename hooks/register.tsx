@@ -142,7 +142,7 @@ function panel($: EngineInterface, e: ResolveInput, ls: Limit[], at: number, col
 function odysseusChip($: EngineInterface, e: ResolveInput, phase: number, url: string) {
   const { Button, Text } = $.ui.resolve(e)
   return (
-    <Button plain key="odysseus" label="Odysseus" onPress={() => void $.process.run(['cmd', '/c', 'start', '', url]).catch(() => $.ui.toast(`Couldn't open ${url}`))}>
+    <Button plain key="odysseus" label="Odysseus" onPress={() => void $.process.run(['cmd', '/c', 'start', '', `${url.replace(/\/+$/, '')}/?handoff=latest`]).catch(() => $.ui.toast(`Couldn't open ${url}`))}>
       <Text backgroundColor={MATRIX_BG[phase]} color={MATRIX_FG[phase]} bold>
         {' ◆ Odysseus › '}
       </Text>

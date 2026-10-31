@@ -123,7 +123,7 @@ test('Claude out: a green Odysseus chip appears in the footer and opens Odysseus
   expect(await footer.find({ type: 'Text', text: /Odysseus/ })).toBeDefined()
   expect(opened).toEqual([]) // nothing opens by itself
   await footer.press({ key: 'odysseus' })
-  expect(opened).toEqual([['cmd', '/c', 'start', '', 'http://localhost:7000']])
+  expect(opened).toEqual([['cmd', '/c', 'start', '', 'http://localhost:7000/?handoff=latest']])
   await footer.unmount()
 })
 
