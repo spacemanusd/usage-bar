@@ -1,7 +1,7 @@
 {
   "name": "usage-bar",
-  "version": "0.3.1",
-  "description": "Plan usage (5-hour and weekly limits) in the footer: click for reset times, warns once at 80%, a green Odysseus shortcut when Claude runs out, and a check_usage tool for Claude.",
+  "version": "0.3.2",
+  "description": "Plan usage (5-hour and weekly limits) in the footer: click for reset times, warns once at 80%, and a check_usage tool for Claude.",
   "author": {
     "name": "spacemanusd"
   },
@@ -22,12 +22,6 @@
       "title": "Warn at percent",
       "description": "Show one pop-up per window when its usage crosses this percent",
       "default": 80
-    },
-    "odysseusUrl": {
-      "type": "string",
-      "title": "Odysseus address",
-      "description": "Opened by the green Odysseus chip that appears when Claude's usage runs out",
-      "default": "http://localhost:7000"
     }
   }
 }
